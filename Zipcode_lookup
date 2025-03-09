@@ -1,0 +1,131 @@
+import requests
+import speech_recognition as sr
+import pyttsx3
+
+class ZipCodeLookup:
+    def __init__(self):
+        self.base_url = "http://api.zippopotam.us/us/" # Uses the Zippopotamus API, no need to link one manually
+        
+        self.engine = pyttsx3.init("sapi5")
+        voices = self.engine.getProperty("voices")
+        self.engine.setProperty("voice", voices[1].id)  
+        self.engine.setProperty("rate", 170)  
+
+        # Mapping of state abbreviations to full state names
+        self.state_mapping = {
+            "AL": "Alabama", 
+            "AK": "Alaska", 
+            "AZ": "Arizona", 
+            "AR": "Arkansas",
+            "CA": "California", 
+            "CO": "Colorado", 
+            "CT": "Connecticut", 
+            "DE": "Delaware",
+            "FL": "Florida", 
+            "GA": "Georgia", 
+            "HI": "Hawaii", 
+            "ID": "Idaho",
+            "IL": "Illinois", 
+            "IN": "Indiana", 
+            "IA": "Iowa", 
+            "KS": "Kansas",
+            "KY": "Kentucky", 
+            "LA": "Louisiana", 
+            "ME": "Maine", 
+            "MD": "Maryland",
+            "MA": "Massachusetts", 
+            "MI": "Michigan", 
+            "MN": "Minnesota", 
+            "MS": "Mississippi",
+            "MO": "Missouri", 
+            "MT": "Montana", 
+            "NE": "Nebraska", 
+            "NV": "Nevada",
+            "NH": "New Hampshire", 
+            "NJ": "New Jersey", 
+            "NM": "New Mexico", 
+            "NY": "New York",
+            "NC": "North Carolina", 
+            "ND": "North Dakota", 
+            "OH": "Ohio", 
+            "OK": "Oklahoma",
+            "OR": "Oregon", 
+            "PA": "Pennsylvania", 
+            "RI": "Rhode Island", 
+            "SC": "South Carolina",
+            "SD": "South Dakota", 
+            "TN": "Tennessee", 
+            "TX": "Texas", 
+            "UT": "Utah",
+            "VT": "Vermont", 
+            "VA": "Virginia", 
+            "WA": "Washington", 
+            "WV": "West Virginia",
+            "WI": "Wisconsin", 
+            "WY": "Wyoming"
+        }
+
+    def speak(self, text):
+        self.engine.say(text)
+        self.engine.runAndWait()    
+
+    def lookup(self, zip_code):
+        """Look up the zip code and return the information."""
+        response = requests.get(f"{self.base_url}{zip_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Extracting relevant information
+            state_abbr = data['places'][0]['state abbreviation']
+            country = data['country']
+            cities = [place['place name'] for place in data['places']]
+            cities_string = ', '.join(cities)  # Join cities with a comma
+            
+            # Get full state name from abbreviation
+            state_full = self.state_mapping.get(state_abbr, state_abbr)  # Default to abbreviation if not found
+            
+            return {
+                "cities": cities_string,
+                "state": state_full,
+                "zip_code": zip_code,
+                "country": country,
+            }
+        else:
+            return None
+
+    def recognize_zip_code(self):
+        """Recognize zip code from speech input."""
+        recognizer = sr.Recognizer()
+        with sr.Microphone() as source:
+            print("Listening for zip code...")
+            audio = recognizer.listen(source)
+            try:
+                zip_code = recognizer.recognize_google(audio)
+                print(f"You said: {zip_code}")
+                return zip_code
+            except sr.UnknownValueError:
+                print("Sorry, I could not understand the audio.")
+                return None
+            except sr.RequestError:
+                print("Could not request results from Google Speech Recognition service.")
+                return None
+
+if __name__ == "__main__":
+    lookup = ZipCodeLookup()
+    
+    zip_code = lookup.recognize_zip_code()
+    
+    if zip_code:
+        result = lookup.lookup(zip_code)
+        if result:
+            print(f"Cities: {result['cities']}")
+            print(f"State: {result['state']}")
+            print(f"Zip Code: {result['zip_code']}")
+            print(f"Country: {result['country']}")
+
+            lookup.speak(f"Cities: {result['cities']}")
+            lookup.speak(f"{result['state']}")
+            lookup.speak(f"{result['zip_code']}") # This will sometimes speak as a single number
+            lookup.speak(f"{result['country']}")
+        else:
+            print("Zip code not found.")
